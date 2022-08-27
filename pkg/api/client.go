@@ -55,13 +55,20 @@ type LoginDelayedSuccessPayload struct {
 	Position   int    `json:"position,string,omitempty"`
 }
 
-type PatchManifest map[string]*PatchSpec
+type PatchManifest map[string]*ManifestEntry
+
+type ManifestEntry struct {
+	Download       string                `json:"dl"`
+	Only           []string              `json:"only"`
+	Hash           string                `json:"hash"`
+	CompressedHash string                `json:"compHash"`
+	Patches        map[string]*PatchSpec `json:"patches"`
+}
 
 type PatchSpec struct {
-	Download       string   `json:"dl"`
-	Only           []string `json:"only"`
-	Hash           string   `json:"hash"`
-	CompressedHash string   `json:"compHash"`
+	Filename            string `json:"filename"`
+	PatchHash           string `json:"patchHash"`
+	CompressedPatchHash string `json:"compPatchHash"`
 }
 
 type LoginClient interface {

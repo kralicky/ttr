@@ -8,9 +8,9 @@ import (
 	"io"
 	"os"
 	"path/filepath"
-	"sync"
 
 	"github.com/kralicky/ttr/pkg/api"
+	"golang.org/x/sync/errgroup"
 )
 
 func DataDir() (string, error) {
@@ -40,52 +40,59 @@ func SyncGameData(ctx context.Context, client api.Client) error {
 		return err
 	}
 
-	var wg sync.WaitGroup
+	eg, ctx := errgroup.WithContext(ctx)
 	for filename, spec := range patchManifest {
 		if !ShouldDownload(spec) {
 			continue
 		}
-		wg.Add(1)
-		go func(filename string, spec *api.PatchSpec) {
-			defer wg.Done()
+		filename := filename
+		spec := spec
+		eg.Go(func() error {
 			f, err := os.OpenFile(filepath.Join(dataDir, filename), os.O_CREATE|os.O_RDWR, 0644)
 			if err != nil {
-				fmt.Fprintf(os.Stderr, "error opening file %s: %v\n", filename, err)
-				return
+				return fmt.Errorf("error opening file %s: %v", filename, err)
 			}
 			defer f.Close()
 
 			hash := sha1.New()
-			io.Copy(hash, f)
-			f.Seek(0, io.SeekStart)
+			if _, err := io.Copy(hash, f); err != nil {
+				return fmt.Errorf("error reading file %s: %v", filename, err)
+			}
 			if fmt.Sprintf("%x", hash.Sum(nil)) == spec.Hash {
 				// file is up to date
-				return
+				return nil
 			}
+			f.Seek(0, io.SeekStart)
+			f.Truncate(0)
 
 			wc, err := client.DownloadFile(ctx, spec.Download)
 			if err != nil {
-				fmt.Fprintf(os.Stderr, "error downloading file %s: %v\n", filename, err)
-				return
+				return fmt.Errorf("error downloading file %s: %v", filename, err)
 			}
 			defer wc.Close()
 			// copy wc to f, and compute the hash of the downloaded contents as we go
-			dlHash := sha1.New()
-			bz2 := bzip2.NewReader(io.TeeReader(wc, dlHash))
+			compHash := sha1.New()
+			decompHash := sha1.New()
+			bz2 := io.TeeReader(bzip2.NewReader(io.TeeReader(wc, compHash)), decompHash)
 			if _, err := io.Copy(f, bz2); err != nil {
-				fmt.Fprintf(os.Stderr, "error while writing file %s: %v\n", filename, err)
-				return
+				return fmt.Errorf("error while writing file %s: %v", filename, err)
 			}
 
 			// compare the hash of the compressed contents with the expected hash
-			sum := fmt.Sprintf("%x", dlHash.Sum(nil))
-			if sum != spec.CompressedHash {
+
+			if sum := fmt.Sprintf("%x", compHash.Sum(nil)); sum != spec.CompressedHash {
 				fmt.Println("got:", sum)
 				fmt.Println("exp:", spec.CompressedHash)
-				panic("hash mismatch: downloaded contents of file " + filename + " do not match the expected hash")
+				return fmt.Errorf("hash mismatch: downloaded contents of file %s do not match the expected hash", filename)
 			}
-		}(filename, spec)
+			if sum := fmt.Sprintf("%x", decompHash.Sum(nil)); sum != spec.Hash {
+				fmt.Println("got:", sum)
+				fmt.Println("exp:", spec.Hash)
+				return fmt.Errorf("hash mismatch: decompressed contents of file %s do not match the expected hash", filename)
+			}
+			return nil
+		})
 	}
-	wg.Wait()
-	return nil
+
+	return eg.Wait()
 }

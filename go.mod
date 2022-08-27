@@ -8,6 +8,7 @@ require (
 	github.com/spf13/cobra v1.5.0
 	github.com/spf13/viper v1.12.0
 	github.com/zalando/go-keyring v0.2.1
+	golang.org/x/sync v0.0.0-20201207232520-09787c993a3a
 )
 
 require (
