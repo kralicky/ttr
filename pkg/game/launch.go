@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/kralicky/ttr/pkg/api"
+	log "github.com/sirupsen/logrus"
 )
 
 func LaunchProcess(ctx context.Context, creds *api.LoginSuccessPayload) error {
@@ -24,22 +25,23 @@ func LaunchProcess(ctx context.Context, creds *api.LoginSuccessPayload) error {
 	}
 
 	timestamp := time.Now().Unix()
-	log := filepath.Join(logsDir, fmt.Sprintf("ttr-%d.log", time.Now().Unix()))
+	logFile := filepath.Join(logsDir, fmt.Sprintf("ttr-%d.log", time.Now().Unix()))
 	// if the name exists, add 1 to the timestamp
 	for {
-		_, err := os.Stat(log)
+		_, err := os.Stat(logFile)
 		if os.IsNotExist(err) {
 			break
 		}
 		timestamp++
-		log = filepath.Join(logsDir, fmt.Sprintf("ttr-%d.log", timestamp))
+		logFile = filepath.Join(logsDir, fmt.Sprintf("ttr-%d.log", timestamp))
 	}
 	// open the log file for writing
-	f, err := os.Create(log)
+	f, err := os.Create(logFile)
 	if err != nil {
 		return err
 	}
 	defer f.Close()
+	log.Infof("writing logs to %s", logFile)
 
 	binary := filepath.Join(dir, Executable)
 	// ensure the file is executable
@@ -57,10 +59,10 @@ func LaunchProcess(ctx context.Context, creds *api.LoginSuccessPayload) error {
 			select {
 			case <-sigint:
 				if count == 0 {
-					fmt.Println("\nReceived Ctrl+C once; press again to exit")
+					log.Warn("\nReceived Ctrl+C once; press again to exit")
 					count++
 				} else {
-					fmt.Println("\nReceived Ctrl+C twice; exiting...")
+					log.Warn("\nReceived Ctrl+C twice; exiting...")
 					ca()
 				}
 			case <-ctx.Done():
@@ -69,7 +71,7 @@ func LaunchProcess(ctx context.Context, creds *api.LoginSuccessPayload) error {
 	}()
 	cmd := exec.CommandContext(ctx, binary)
 	cmd.Dir = dir
-	cmd.Env = append(os.Environ(),
+	cmd.Env = append(cmd.Environ(),
 		"TTR_GAMESERVER="+creds.Gameserver,
 		"TTR_PLAYCOOKIE="+creds.Cookie,
 	)

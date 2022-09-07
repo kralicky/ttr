@@ -74,6 +74,7 @@ type PatchSpec struct {
 type LoginClient interface {
 	Login(ctx context.Context, username, password string) (*LoginResponse, error)
 	RetryDelayedLogin(ctx context.Context, queueToken string) (*LoginResponse, error)
+	CompleteTwoFactorAuth(ctx context.Context, responseToken, code string) (*LoginResponse, error)
 }
 
 type DownloadClient interface {
@@ -124,6 +125,27 @@ func (c *client) Login(ctx context.Context, username, password string) (*LoginRe
 func (c *client) RetryDelayedLogin(ctx context.Context, queueToken string) (*LoginResponse, error) {
 	form := url.Values{}
 	form.Add("queueToken", queueToken)
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, apiEndpoint+"/login?format=json", strings.NewReader(form.Encode()))
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+	var loginResp LoginResponse
+	if err := json.NewDecoder(resp.Body).Decode(&loginResp); err != nil {
+		return nil, err
+	}
+	return &loginResp, nil
+}
+
+func (c *client) CompleteTwoFactorAuth(ctx context.Context, responseToken, code string) (*LoginResponse, error) {
+	form := url.Values{}
+	form.Add("authToken", responseToken)
+	form.Add("appToken", code)
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, apiEndpoint+"/login?format=json", strings.NewReader(form.Encode()))
 	if err != nil {
 		return nil, err

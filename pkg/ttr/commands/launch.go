@@ -16,7 +16,6 @@ import (
 
 // LaunchCmd represents the launch command
 func BuildLaunchCmd() *cobra.Command {
-
 	cmd := &cobra.Command{
 		Use:   "launch",
 		Short: "Launch the TTR engine",
@@ -59,25 +58,42 @@ func BuildLaunchCmd() *cobra.Command {
 				if err != nil {
 					return err
 				}
-				switch resp.Success {
-				case api.SuccessTrue:
-
-				case api.SuccessFalse:
-					return fmt.Errorf("login failed: %s", resp.Message)
-				case api.SuccessPartial:
-					return fmt.Errorf("two-factor authentication not supported yet")
-				case api.SuccessDelayed:
-					for {
-						time.Sleep(1 * time.Second)
-						retryResp, err := client.RetryDelayedLogin(cmd.Context(), resp.QueueToken)
-						if err == nil {
-							if retryResp.Success == api.SuccessTrue {
-								resp = retryResp
-								break
+			RESPONSE:
+				for {
+					switch resp.Success {
+					case api.SuccessTrue:
+						break RESPONSE
+					case api.SuccessFalse:
+						return fmt.Errorf("login failed: %s", resp.Message)
+					case api.SuccessPartial:
+						var code string
+						if auth.HasTwoFactorAuthSecret(account) {
+							var err error
+							code, err = auth.GenerateTwoFactorAuthCode(account)
+							if err != nil {
+								return err
+							}
+							fmt.Printf("Generating two-factor authentication code for %s...\n", account)
+						} else {
+							if err := survey.AskOne(&survey.Password{
+								Message: "Enter a two-factor authentication code for " + account + ":",
+							}, &code); err != nil {
+								return err
 							}
 						}
+						resp, err = client.CompleteTwoFactorAuth(cmd.Context(), resp.ResponseToken, code)
+						if err != nil {
+							return err
+						}
+					case api.SuccessDelayed:
+						if resp.ETA > 0 {
+							time.Sleep(1 * time.Second)
+						}
+						resp, err = client.RetryDelayedLogin(cmd.Context(), resp.QueueToken)
+						if err != nil {
+							return err
+						}
 					}
-
 				}
 
 				// wait for updates to finish
