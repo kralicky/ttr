@@ -55,25 +55,34 @@ func SyncGameData(ctx context.Context, client api.DownloadClient) error {
 		filename := filename
 		spec := spec
 		eg.Go(func() error {
+			path := filepath.Join(dataDir, filename)
+			var sum string
+			if _, err := os.Stat(path); err == nil {
+				// open the file in read-only mode first
+				f, err := os.Open(filepath.Join(dataDir, filename))
+				if err != nil {
+					return fmt.Errorf("error opening file %s for reading: %w", filename, err)
+				}
+
+				hash := sha1.New()
+				if _, err := io.Copy(hash, f); err != nil {
+					f.Close()
+					return fmt.Errorf("error reading file %s: %w", filename, err)
+				}
+				f.Close()
+
+				sum = hex.EncodeToString(hash.Sum(nil))
+				if sum == spec.Hash {
+					// file is up to date
+					log.WithField("filename", filename).Debug("file is up to date")
+					return nil
+				}
+			}
+
 			f, err := os.OpenFile(filepath.Join(dataDir, filename), os.O_CREATE|os.O_RDWR, 0644)
 			if err != nil {
-				return fmt.Errorf("error opening file %s: %w", filename, err)
+				return fmt.Errorf("error opening file %s for writing: %w", filename, err)
 			}
-			defer f.Close()
-
-			hash := sha1.New()
-			if _, err := io.Copy(hash, f); err != nil {
-				return fmt.Errorf("error reading file %s: %w", filename, err)
-			}
-			sum := hex.EncodeToString(hash.Sum(nil))
-			if sum == spec.Hash {
-				// file is up to date
-				log.WithField("filename", filename).Debug("file is up to date")
-				return nil
-			}
-
-			f.Seek(0, io.SeekStart)
-
 			// check if there is a known patch available for the file we have
 			if p, ok := spec.Patches[sum]; ok {
 				return fetchAndPatchFile(ctx, client, filename, spec, p, f)
@@ -167,6 +176,7 @@ func fetchAndPatchFile(
 	}
 
 	// write the patched file to disk
+	f.Seek(0, io.SeekStart)
 	f.Truncate(0)
 	if _, err := io.Copy(f, patchedFileBuf); err != nil {
 		return fmt.Errorf("error while writing file %s: %w", filename, err)
