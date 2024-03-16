@@ -47,6 +47,7 @@ func BuildRootCmd() *cobra.Command {
 	rootCmd.AddCommand(commands.BuildLaunchCmd())
 	rootCmd.AddCommand(commands.BuildConfigCmd())
 	rootCmd.AddCommand(commands.BuildDirCmd())
+	rootCmd.AddCommand(commands.BuildMultitoonCmd())
 	//+cobra:subcommands
 
 	rootCmd.PersistentFlags().StringVar(&logLevel, "log-level", "info", "Log level (debug, info, warn, error)")

@@ -69,11 +69,12 @@ func BuildLaunchCmd() *cobra.Command {
 						var code string
 						if auth.HasTwoFactorAuthSecret(account) {
 							var err error
+							fmt.Printf("Generating two-factor authentication code for %s...\n", account)
 							code, err = auth.GenerateTwoFactorAuthCode(account)
 							if err != nil {
+								fmt.Fprintf(os.Stderr, "error generating two-factor authentication code: %s", err)
 								return err
 							}
-							fmt.Printf("Generating two-factor authentication code for %s...\n", account)
 						} else {
 							if err := survey.AskOne(&survey.Password{
 								Message: "Enter a two-factor authentication code for " + account + ":",

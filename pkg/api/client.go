@@ -160,6 +160,9 @@ func (c *client) CompleteTwoFactorAuth(ctx context.Context, responseToken, code 
 	if err := json.NewDecoder(resp.Body).Decode(&loginResp); err != nil {
 		return nil, err
 	}
+	if loginResp.Success == "partial" {
+		return nil, fmt.Errorf("API error submitting 2FA code (try logging in to the website once): %s", loginResp.Message)
+	}
 	return &loginResp, nil
 }
 

@@ -20,7 +20,7 @@ func LaunchProcess(ctx context.Context, creds *api.LoginSuccessPayload) error {
 		return err
 	}
 	logsDir := filepath.Join(dir, "logs")
-	if err := os.MkdirAll(logsDir, 0755); err != nil {
+	if err := os.MkdirAll(logsDir, 0o755); err != nil {
 		return err
 	}
 
@@ -45,7 +45,7 @@ func LaunchProcess(ctx context.Context, creds *api.LoginSuccessPayload) error {
 
 	binary := filepath.Join(dir, Executable)
 	// ensure the file is executable
-	if err := os.Chmod(binary, 0755); err != nil {
+	if err := os.Chmod(binary, 0o755); err != nil {
 		return err
 	}
 	ctx, ca := context.WithCancel(ctx)
