@@ -25,6 +25,7 @@ import "C"
 
 import (
 	"fmt"
+	"unsafe"
 )
 
 type XdoContext struct {
@@ -75,16 +76,20 @@ func NewManager() (*Manager, error) {
 	return mgr, nil
 }
 
-func (m *Manager) sendKeyDown(key *C.char) {
+func (m *Manager) sendKeyDown(key string) {
+	keycstr := C.CString(key)
 	for _, w := range m.windows {
-		C.xdo_send_keysequence_window_down(m.xdt, *w.xid, key, 0)
+		C.xdo_send_keysequence_window_down(m.xdt, *w.xid, keycstr, 0)
 	}
+	C.free(unsafe.Pointer(keycstr))
 }
 
-func (m *Manager) sendKeyUp(key *C.char) {
+func (m *Manager) sendKeyUp(key string) {
+	keycstr := C.CString(key)
 	for _, w := range m.windows {
-		C.xdo_send_keysequence_window_up(m.xdt, *w.xid, key, 0)
+		C.xdo_send_keysequence_window_up(m.xdt, *w.xid, keycstr, 0)
 	}
+	C.free(unsafe.Pointer(keycstr))
 }
 
 func (m *Manager) RunInputWindow() {
@@ -102,7 +107,7 @@ func (m *Manager) RunInputWindow() {
 		m.xdt.xdpy,
 		root,
 		0, 0,
-		200, 200,
+		250, 200,
 		1,
 		blackPixel,
 		whitePixel,
@@ -124,7 +129,7 @@ func (m *Manager) RunInputWindow() {
 		C.XNextEvent(m.xdt.xdpy, &event)
 
 		var keyEvent *C.XKeyEvent
-		var sendFunc func(*C.char)
+		var sendFunc func(string)
 		switch C.event_type(&event) {
 		case C.KeyPress:
 			keyEvent = C.key_event(&event)
@@ -143,9 +148,16 @@ func (m *Manager) RunInputWindow() {
 			continue
 		}
 
+		var modifier string
+		if keyEvent.state&C.ShiftMask != 0 && (keyEvent.keycode != 50 && keyEvent.keycode != 62) {
+			modifier = "shift+"
+		}
 		keysym := C.XkbKeycodeToKeysym(m.xdt.xdpy, C.KeyCode(keyEvent.keycode), 0, 0)
 		keystr := C.XKeysymToString(keysym) // do not free the result
-		sendFunc(keystr)
+
+		fullKeyStr := modifier + C.GoString(keystr)
+		// fmt.Printf("sending %q\n", fullKeyStr)
+		sendFunc(fullKeyStr)
 	}
 }
 
