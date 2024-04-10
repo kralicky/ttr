@@ -1,13 +1,18 @@
 module github.com/kralicky/ttr
 
-go 1.19
+go 1.22
 
 require (
 	github.com/AlecAivazis/survey/v2 v2.3.5
 	github.com/gabstv/go-bsdiff v1.0.5
+	github.com/go-gl/gl v0.0.0-20231021071112-07e5d0ea2e71
+	github.com/go-gl/glfw/v3.3/glfw v0.0.0-20200222043503-6f7a984d4dc4
 	github.com/jedib0t/go-pretty/v6 v6.3.7
+	github.com/pquerna/otp v1.3.0
+	github.com/sirupsen/logrus v1.9.0
 	github.com/spf13/cobra v1.5.0
 	github.com/spf13/viper v1.12.0
+	github.com/stretchr/testify v1.9.0
 	github.com/zalando/go-keyring v0.2.1
 	golang.org/x/sync v0.0.0-20201207232520-09787c993a3a
 )
@@ -16,6 +21,7 @@ require (
 	github.com/alessio/shellescape v1.4.1 // indirect
 	github.com/boombuler/barcode v1.0.1-0.20190219062509-6c824513bacc // indirect
 	github.com/danieljoos/wincred v1.1.0 // indirect
+	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/dsnet/compress v0.0.0-20171208185109-cc9eb1d7ad76 // indirect
 	github.com/fsnotify/fsnotify v1.5.4 // indirect
 	github.com/godbus/dbus/v5 v5.0.6 // indirect
@@ -30,9 +36,8 @@ require (
 	github.com/mitchellh/mapstructure v1.5.0 // indirect
 	github.com/pelletier/go-toml v1.9.5 // indirect
 	github.com/pelletier/go-toml/v2 v2.0.1 // indirect
-	github.com/pquerna/otp v1.3.0 // indirect
+	github.com/pmezard/go-difflib v1.0.0 // indirect
 	github.com/rivo/uniseg v0.2.0 // indirect
-	github.com/sirupsen/logrus v1.9.0 // indirect
 	github.com/spf13/afero v1.8.2 // indirect
 	github.com/spf13/cast v1.5.0 // indirect
 	github.com/spf13/jwalterweatherman v1.1.0 // indirect

@@ -3,6 +3,7 @@ package game
 import (
 	"context"
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
 	"os/signal"
@@ -43,6 +44,29 @@ func LaunchProcess(ctx context.Context, creds *api.LoginSuccessPayload) error {
 	defer f.Close()
 	log.Infof("writing logs to %s", logFile)
 
+	statusR, statusW := io.Pipe()
+	statusTracker := NewStatusTracker(statusR)
+	go statusTracker.Run()
+	go func() {
+		for status := range statusTracker.C {
+			log.Infof("new zone: %s", status.Request)
+			go func() {
+				if status.Request.Where == "MintInterior" {
+					log.Debugf("entered mint, waiting for logs...")
+					info, err := ScanForMintInfo(status.ZoneLogs)
+					if err != nil {
+						log.Warnf("error scanning for mint info: %v", err)
+						return
+					}
+					log.Infof("mint info: %s", info)
+					ShowMintInfo(info)
+				}
+			}()
+		}
+	}()
+
+	logWriter := io.MultiWriter(f, statusW)
+
 	binary := filepath.Join(dir, Executable)
 	// ensure the file is executable
 	if err := os.Chmod(binary, 0o755); err != nil {
@@ -75,8 +99,8 @@ func LaunchProcess(ctx context.Context, creds *api.LoginSuccessPayload) error {
 		"TTR_GAMESERVER="+creds.Gameserver,
 		"TTR_PLAYCOOKIE="+creds.Cookie,
 	)
-	cmd.Stdout = f
-	cmd.Stderr = f
+	cmd.Stdout = logWriter
+	cmd.Stderr = logWriter
 	cmd.SysProcAttr = &syscall.SysProcAttr{
 		Setpgid: true,
 	}
