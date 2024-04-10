@@ -2,12 +2,13 @@ package game_test
 
 import (
 	"bytes"
+	"context"
 	"image/png"
 	"os"
 	"testing"
+	"time"
 
 	"github.com/kralicky/ttr/pkg/game"
-	log "github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -41,7 +42,8 @@ func TestMain(m *testing.M) {
 func TestWindow(t *testing.T) {
 	info := game.MintInfo{StageId: game.CoinMintId, Floor: 5}
 
-	err := game.ShowMintInfo(info)
+	ctx, _ := context.WithTimeout(context.Background(), 5*time.Second)
+	err := game.ShowMintInfo(ctx, info)
 	if err != nil {
 		t.Fatalf("error showing mint info: %v", err)
 	}
@@ -54,20 +56,5 @@ func TestMintStatusTracker(t *testing.T) {
 	}
 	statusTracker := game.NewStatusTracker(logFile)
 	go statusTracker.Run()
-
-	for status := range statusTracker.C {
-		log.Infof("new zone: %s", status.Request)
-		go func() {
-			if status.Request.Where == "MintInterior" {
-				log.Debugf("entered mint, waiting for logs...")
-				info, err := game.ScanForMintInfo(status.ZoneLogs)
-				if err != nil {
-					log.Warnf("error scanning for mint info: %v", err)
-					return
-				}
-				log.Infof("mint info: %s", info)
-				game.ShowMintInfo(info)
-			}
-		}()
-	}
+	go game.RunMintInfoManager(statusTracker)
 }

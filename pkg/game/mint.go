@@ -1,6 +1,7 @@
 package game
 
 import (
+	"context"
 	"embed"
 	"errors"
 	"fmt"
@@ -15,6 +16,7 @@ import (
 	"github.com/go-gl/gl/v4.6-core/gl"
 	"github.com/go-gl/glfw/v3.3/glfw"
 	"github.com/sirupsen/logrus"
+	log "github.com/sirupsen/logrus"
 )
 
 //go:embed maps
@@ -89,8 +91,6 @@ var (
 
 var runGLFWOnce sync.Once
 
-var mainGoroutineID uint64
-
 func init() {
 	runtime.LockOSThread()
 }
@@ -120,7 +120,7 @@ func ShutdownGLFW() {
 	<-glfwDone
 }
 
-func ShowMintInfo(info MintInfo) error {
+func ShowMintInfo(ctx context.Context, info MintInfo) error {
 	img, err := info.MapImage()
 	if err != nil {
 		return err
@@ -139,6 +139,11 @@ func ShowMintInfo(info MintInfo) error {
 			return err
 		}
 		window.MakeContextCurrent()
+
+		stop := context.AfterFunc(ctx, func() {
+			window.SetShouldClose(true)
+			glfw.PostEmptyEvent()
+		})
 
 		gl.Init()
 		gl.Enable(gl.TEXTURE_2D)
@@ -167,10 +172,38 @@ func ShowMintInfo(info MintInfo) error {
 			window.SwapBuffers()
 			glfw.WaitEvents()
 		}
+		stop()
 
 		window.Destroy()
 		return nil
 	}
 
 	return nil
+}
+
+func RunMintInfoManager(statusTracker *StatusTracker) {
+	var ca context.CancelFunc
+	for status := range statusTracker.C {
+		if ca != nil {
+			ca()
+		}
+		var ctx context.Context
+		ctx, ca = context.WithCancel(context.Background())
+		log.Debugf("new zone: %s", status.Request)
+		if status.Request.Where == "MintInterior" {
+			log.Debugf("entered mint, waiting for logs...")
+			go func() {
+				info, err := ScanForMintInfo(status.ZoneLogs)
+				if err != nil {
+					log.Warnf("error scanning for mint info: %v", err)
+					return
+				}
+				log.Debugf("mint info: %s", info)
+				ShowMintInfo(ctx, info)
+			}()
+		}
+	}
+	if ca != nil {
+		ca()
+	}
 }

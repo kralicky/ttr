@@ -47,23 +47,7 @@ func LaunchProcess(ctx context.Context, creds *api.LoginSuccessPayload) error {
 	statusR, statusW := io.Pipe()
 	statusTracker := NewStatusTracker(statusR)
 	go statusTracker.Run()
-	go func() {
-		for status := range statusTracker.C {
-			log.Infof("new zone: %s", status.Request)
-			go func() {
-				if status.Request.Where == "MintInterior" {
-					log.Debugf("entered mint, waiting for logs...")
-					info, err := ScanForMintInfo(status.ZoneLogs)
-					if err != nil {
-						log.Warnf("error scanning for mint info: %v", err)
-						return
-					}
-					log.Infof("mint info: %s", info)
-					ShowMintInfo(info)
-				}
-			}()
-		}
-	}()
+	go RunMintInfoManager(statusTracker)
 
 	logWriter := io.MultiWriter(f, statusW)
 

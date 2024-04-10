@@ -19,6 +19,12 @@ func BuildLaunchCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "launch",
 		Short: "Launch the TTR engine",
+		PreRun: func(cmd *cobra.Command, args []string) {
+			go game.RunGLFW()
+		},
+		PostRun: func(cmd *cobra.Command, args []string) {
+			game.ShutdownGLFW()
+		},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			// check for updates in the background
 			client := api.NewClient()
