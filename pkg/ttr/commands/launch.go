@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/AlecAivazis/survey/v2"
+	"github.com/jedib0t/go-pretty/v6/text"
 	"github.com/kralicky/ttr/pkg/api"
 	"github.com/kralicky/ttr/pkg/auth"
 	"github.com/kralicky/ttr/pkg/config"
@@ -28,6 +29,20 @@ func BuildLaunchCmd() *cobra.Command {
 		RunE: func(cmd *cobra.Command, args []string) error {
 			// check for updates in the background
 			client := api.NewClient()
+
+			status, err := client.Status(cmd.Context())
+			if err != nil {
+				return err
+			}
+			banner := status.Banner
+			if !status.Open {
+				if banner == "" {
+					banner = "(no details given)"
+				}
+				cmd.Printf(text.Colors{text.FgRed}.Sprintf("Game may be closed: %s\n", banner))
+			} else if banner != "" {
+				cmd.Printf(text.Colors{text.Bold, text.FgYellow}.Sprintf("%s\n\n", banner))
+			}
 			doneUpdating := make(chan error, 1)
 			go func() {
 				defer close(doneUpdating)

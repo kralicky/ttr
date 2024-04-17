@@ -71,6 +71,13 @@ type PatchSpec struct {
 	CompressedPatchHash string `json:"compPatchHash"`
 }
 
+type StatusSpec struct {
+	Open               bool   `json:"open"`
+	Banner             string `json:"banner"`
+	LastCookieIssuedAt int64  `json:"lastCookieIssuedAt"`
+	LastGameAuthAt     int64  `json:"lastGameAuthAt"`
+}
+
 type LoginClient interface {
 	Login(ctx context.Context, username, password string) (*LoginResponse, error)
 	RetryDelayedLogin(ctx context.Context, queueToken string) (*LoginResponse, error)
@@ -85,6 +92,8 @@ type DownloadClient interface {
 type Client interface {
 	LoginClient
 	DownloadClient
+
+	Status(ctx context.Context) (StatusSpec, error)
 }
 
 type client struct {
@@ -197,4 +206,21 @@ func (c *client) DownloadFile(ctx context.Context, name string) (io.ReadCloser, 
 		return nil, fmt.Errorf("download failed: unexpected status: %s", resp.Status)
 	}
 	return resp.Body, nil
+}
+
+func (c *client) Status(ctx context.Context) (StatusSpec, error) {
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, apiEndpoint+"/status", nil)
+	if err != nil {
+		return StatusSpec{}, err
+	}
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return StatusSpec{}, err
+	}
+	defer resp.Body.Close()
+	var status StatusSpec
+	if err := json.NewDecoder(resp.Body).Decode(&status); err != nil {
+		return StatusSpec{}, err
+	}
+	return status, nil
 }
