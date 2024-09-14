@@ -119,13 +119,21 @@ func (c *client) Login(ctx context.Context, username, password string) (*LoginRe
 		return nil, err
 	}
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	req.Header.Set("Accept", "application/json")
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
 		return nil, err
 	}
 	defer resp.Body.Close()
+	respData, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, err
+	}
+	if resp.StatusCode/100 != 2 {
+		return nil, fmt.Errorf("API error: %s", string(respData))
+	}
 	var loginResp LoginResponse
-	if err := json.NewDecoder(resp.Body).Decode(&loginResp); err != nil {
+	if err := json.Unmarshal(respData, &loginResp); err != nil {
 		return nil, err
 	}
 	return &loginResp, nil
@@ -139,13 +147,21 @@ func (c *client) RetryDelayedLogin(ctx context.Context, queueToken string) (*Log
 		return nil, err
 	}
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	req.Header.Set("Accept", "application/json")
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
 		return nil, err
 	}
 	defer resp.Body.Close()
+	respData, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, err
+	}
+	if resp.StatusCode/100 != 2 {
+		return nil, fmt.Errorf("API error: %s", string(respData))
+	}
 	var loginResp LoginResponse
-	if err := json.NewDecoder(resp.Body).Decode(&loginResp); err != nil {
+	if err := json.Unmarshal(respData, &loginResp); err != nil {
 		return nil, err
 	}
 	return &loginResp, nil
@@ -160,13 +176,21 @@ func (c *client) CompleteTwoFactorAuth(ctx context.Context, responseToken, code 
 		return nil, err
 	}
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	req.Header.Set("Accept", "application/json")
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
 		return nil, err
 	}
 	defer resp.Body.Close()
+	respData, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, err
+	}
+	if resp.StatusCode/100 != 2 {
+		return nil, fmt.Errorf("API error: %s", string(respData))
+	}
 	var loginResp LoginResponse
-	if err := json.NewDecoder(resp.Body).Decode(&loginResp); err != nil {
+	if err := json.Unmarshal(respData, &loginResp); err != nil {
 		return nil, err
 	}
 	if loginResp.Success == "partial" {
@@ -180,6 +204,7 @@ func (c *client) DownloadPatchManifest(ctx context.Context) (PatchManifest, erro
 	if err != nil {
 		return nil, err
 	}
+	req.Header.Set("Accept", "application/json")
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
 		return nil, err

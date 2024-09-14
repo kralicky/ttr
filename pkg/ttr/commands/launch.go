@@ -17,6 +17,7 @@ import (
 
 // LaunchCmd represents the launch command
 func BuildLaunchCmd() *cobra.Command {
+	var skipUpdateCheck bool
 	cmd := &cobra.Command{
 		Use:   "launch",
 		Short: "Launch the TTR engine",
@@ -32,7 +33,7 @@ func BuildLaunchCmd() *cobra.Command {
 
 			status, err := client.Status(cmd.Context())
 			if err != nil {
-				return err
+				return fmt.Errorf("failed to get game status: %w", err)
 			}
 			banner := status.Banner
 			if !status.Open {
@@ -44,12 +45,16 @@ func BuildLaunchCmd() *cobra.Command {
 				cmd.Printf(text.Colors{text.Bold, text.FgYellow}.Sprintf("%s\n\n", banner))
 			}
 			doneUpdating := make(chan error, 1)
-			go func() {
-				defer close(doneUpdating)
-				if err := game.SyncGameData(cmd.Context(), client); err != nil {
-					doneUpdating <- err
-				}
-			}()
+			if skipUpdateCheck {
+				close(doneUpdating)
+			} else {
+				go func() {
+					defer close(doneUpdating)
+					if err := game.SyncGameData(cmd.Context(), client); err != nil {
+						doneUpdating <- err
+					}
+				}()
+			}
 
 			// prompt for account
 			accounts := config.ListAccounts()
@@ -77,7 +82,7 @@ func BuildLaunchCmd() *cobra.Command {
 
 				resp, err := client.Login(cmd.Context(), account, pw)
 				if err != nil {
-					return err
+					return fmt.Errorf("login failed: %w", err)
 				}
 			RESPONSE:
 				for {
@@ -105,7 +110,7 @@ func BuildLaunchCmd() *cobra.Command {
 						}
 						resp, err = client.CompleteTwoFactorAuth(cmd.Context(), resp.ResponseToken, code)
 						if err != nil {
-							return err
+							return fmt.Errorf("two-factor authentication failed: %w", err)
 						}
 					case api.SuccessDelayed:
 						if resp.ETA > 0 {
@@ -113,14 +118,14 @@ func BuildLaunchCmd() *cobra.Command {
 						}
 						resp, err = client.RetryDelayedLogin(cmd.Context(), resp.QueueToken)
 						if err != nil {
-							return err
+							return fmt.Errorf("failed to retry delayed login: %w", err)
 						}
 					}
 				}
 
 				// wait for updates to finish
 				if err := <-doneUpdating; err != nil {
-					return err
+					return fmt.Errorf("update failed: %w", err)
 				}
 
 				wg.Add(1)
@@ -137,5 +142,7 @@ func BuildLaunchCmd() *cobra.Command {
 			return nil
 		},
 	}
+
+	cmd.Flags().BoolVar(&skipUpdateCheck, "skip-update-check", false, "Skip checking for updates")
 	return cmd
 }
